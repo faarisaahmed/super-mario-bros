@@ -1,0 +1,38 @@
+{
+  "tile_size": 16,
+  "tiles": {
+    "0": {
+      "name": "air",
+      "frames": [],
+      "solid": false
+    },
+
+    "1": {
+      "name": "brick",
+      "frames": ["brick.png"],
+      "solid": true
+    },
+
+    "2": {
+      "name": "used_block",
+      "frames": ["empty.png"],
+      "solid": true
+    },
+
+    "3": {
+      "name": "question_block",
+      "frames": [
+        "question1.png",
+        "question2.png",
+        "question3.png"
+      ],
+      "solid": true,
+      "animated": true
+    },
+    "4": {
+      "name": "floor",
+      "frames": ["floor.png"],
+      "solid": true
+    }
+  }
+}
