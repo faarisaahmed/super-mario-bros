@@ -1,5 +1,17 @@
 import pygame
 import math
+import os
+
+# --- 1. INITIALIZE MIXER AND LOAD SOUND ---
+pygame.mixer.init()
+# Increasing channels prevents sounds from cutting each other off
+pygame.mixer.set_num_channels(16)
+
+jump_sound = pygame.mixer.Sound(os.path.join("sfx", "jump_effect.mp3"))
+
+# --- VOLUME CONTROL ---
+# 0.0 is silent, 1.0 is full blast. 0.2 is usually the "sweet spot" for SFX.
+jump_sound.set_volume(0.1) 
 
 class Mario:
     def __init__(self, x, y, scale):
@@ -22,11 +34,9 @@ class Mario:
         # --- TUNING ---
         self.gravity = 800 * self.scale  
         
-        # Max Height (64 pixels)
-        target_max_height = 64 * self.scale
+        target_max_height = 70 * self.scale
         self.jump_force = -math.sqrt(2 * self.gravity * target_max_height)
         
-        # Min Height (24 pixels) - The velocity required to reach exactly 24px
         target_min_height = 24 * self.scale
         self.min_jump_velocity = -math.sqrt(2 * self.gravity * target_min_height)
 
@@ -39,7 +49,6 @@ class Mario:
                            int(self.height * self.scale))
 
     def handle_input(self, keys):
-        # Horizontal Movement
         self.velocity_x = 0
         if keys[pygame.K_RIGHT]:
             self.velocity_x = self.horizontal_speed
@@ -51,21 +60,21 @@ class Mario:
         # Jump Input
         if keys[pygame.K_z]:
             if not self.z_was_pressed and self.on_ground:
-                # Start the full jump
                 self.velocity_y = self.jump_force
                 self.on_ground = False
                 self.y -= 2 
+                
+                # Triggers the quieter sound
+                jump_sound.play()
+                
             self.z_was_pressed = True
         else:
-            # SHORT JUMP LOGIC:
-            # If the button is released, and Mario is rising faster than the 24px velocity limit,
-            # we instantly cap his upward speed to that limit.
             if self.velocity_y < self.min_jump_velocity:
                 self.velocity_y = self.min_jump_velocity
             self.z_was_pressed = False
 
     def update(self, dt, camera_x, solid_tiles):
-        # 1. Horizontal Movement & Collision
+        # Horizontal Movement & Collision
         self.x += self.velocity_x * dt
         mario_rect = self.rect()
         for tile in solid_tiles:
@@ -77,25 +86,25 @@ class Mario:
                 self.velocity_x = 0
                 mario_rect = self.rect()
 
-        # 2. Vertical Movement
+        # Vertical Movement
         self.velocity_y += self.gravity * dt
         if self.velocity_y > self.terminal_velocity:
             self.velocity_y = self.terminal_velocity
         self.y += self.velocity_y * dt
         
-        # 3. Collision Resolution
+        # Collision Resolution
         mario_rect = self.rect()
         for tile in solid_tiles:
             if mario_rect.colliderect(tile):
-                if self.velocity_y > 0: # Falling/Landing
+                if self.velocity_y > 0: 
                     self.y = float(tile.top - mario_rect.height)
                     self.velocity_y = 0
-                elif self.velocity_y < 0: # Hitting ceiling
+                elif self.velocity_y < 0: 
                     self.y = float(tile.bottom)
                     self.velocity_y = 0
                 mario_rect = self.rect()
 
-        # 4. GROUNDED CHECK
+        # GROUNDED CHECK
         ground_sensor = pygame.Rect(int(self.x), int(self.y + 1), 
                                    int(self.width * self.scale), 
                                    int(self.height * self.scale))
@@ -106,7 +115,7 @@ class Mario:
                 self.on_ground = True
                 break
 
-        # 5. Animation State
+        # Animation State
         if not self.on_ground:
             self.current_animation = f"jump {self.direction}"
         elif self.velocity_x != 0:
