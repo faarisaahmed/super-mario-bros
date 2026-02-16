@@ -1,4 +1,5 @@
 import pygame
+import math
 
 class Mario:
     def __init__(self, x, y, scale):
@@ -16,19 +17,31 @@ class Mario:
         self.velocity_x = 0
         self.velocity_y = 0
         self.on_ground = False
+        
+        # Double Jump & Variable Logic
+        self.jumps_left = 2
+        self.z_was_pressed = False 
 
-        # Movement tuning
-        self.horizontal_speed = 200
-        self.jump_force = -600
-        self.gravity = 2000
+        # --- GENTLE FLOATY TUNING ---
+        target_height = 64 * self.scale
+        
+        # Reduced gravity for a much slower "Nintendo" feel
+        self.gravity = 800 * self.scale  
+        
+        # Re-calculating force based on lower gravity
+        self.jump_force = -math.sqrt(2 * self.gravity * target_height)
+        
+        # Lower terminal velocity so he doesn't fall like a rock
+        self.terminal_velocity = 400 * self.scale 
+        self.horizontal_speed = 160 * self.scale # Slower walk speed too
 
     def rect(self):
-        # Convert to int for Pygame's Rect to handle pixel collisions
         return pygame.Rect(int(self.x), int(self.y), 
-                           self.width * self.scale, 
-                           self.height * self.scale)
+                           int(self.width * self.scale), 
+                           int(self.height * self.scale))
 
     def handle_input(self, keys):
+        # Horizontal
         self.velocity_x = 0
         if keys[pygame.K_RIGHT]:
             self.velocity_x = self.horizontal_speed
@@ -37,9 +50,24 @@ class Mario:
             self.velocity_x = -self.horizontal_speed
             self.direction = "left"
 
-        if keys[pygame.K_z] and self.on_ground:
-            self.velocity_y = self.jump_force
-            self.on_ground = False
+        # Jumping Logic
+        if keys[pygame.K_z]:
+            if not self.z_was_pressed:
+                if self.on_ground:
+                    self.velocity_y = self.jump_force
+                    self.on_ground = False
+                    self.jumps_left = 1
+                    self.y -= 2 
+                elif self.jumps_left > 0:
+                    # Double jump 
+                    self.velocity_y = self.jump_force * 0.85
+                    self.jumps_left -= 1
+            self.z_was_pressed = True
+        else:
+            # Variable Jump: Release Z to cut the jump short
+            if self.velocity_y < -50:
+                self.velocity_y = -50
+            self.z_was_pressed = False
 
     def update(self, dt, camera_x, solid_tiles):
         # --- 1. Horizontal Movement ---
@@ -51,32 +79,34 @@ class Mario:
                     self.x = float(tile.left - mario_rect.width)
                 elif self.velocity_x < 0:
                     self.x = float(tile.right)
-                self.velocity_x = 0 # Kill velocity on wall hit
+                self.velocity_x = 0
                 mario_rect = self.rect()
 
         # --- 2. Vertical Movement ---
-        # Apply gravity
         self.velocity_y += self.gravity * dt
+        
+        if self.velocity_y > self.terminal_velocity:
+            self.velocity_y = self.terminal_velocity
+            
         self.y += self.velocity_y * dt
         
-        # Reset on_ground and check collisions
         self.on_ground = False 
         mario_rect = self.rect()
 
         for tile in solid_tiles:
             if mario_rect.colliderect(tile):
-                if self.velocity_y > 0: # Landing / Falling onto floor
+                if self.velocity_y > 0: # Landing
                     self.y = float(tile.top - mario_rect.height)
                     self.velocity_y = 0
                     self.on_ground = True 
-                elif self.velocity_y < 0: # Hitting ceiling
+                    self.jumps_left = 2 
+                elif self.velocity_y < 0: # Ceiling
                     self.y = float(tile.bottom)
                     self.velocity_y = 0
                 mario_rect = self.rect()
 
-        # --- 3. Jitter-Free Animation State Logic ---
-        # We only use 'jump' if he is NOT on the ground 
-        # AND his velocity is substantial (prevents flicker from gravity math)
+        # --- 3. Animation State ---
+        # Threshold lowered slightly to match the slower movement
         if not self.on_ground and abs(self.velocity_y) > 50:
             self.current_animation = f"jump {self.direction}"
         elif self.velocity_x != 0:
@@ -86,14 +116,10 @@ class Mario:
 
     def draw(self, screen, sprites, camera_x, dt):
         frame = sprites.get_frame(self.current_animation, dt)
-        
-        # Centering logic
         diff_x = (frame.get_width() - (self.width * self.scale)) // 2
         img_height = frame.get_height()
         hitbox_bottom = self.y + (self.height * self.scale)
         
-        # Draw at exact integer positions to prevent pixel-bleeding jitter
         draw_x = int(self.x - camera_x - diff_x)
         draw_y = int(hitbox_bottom - img_height)
-        
         screen.blit(frame, (draw_x, draw_y))
