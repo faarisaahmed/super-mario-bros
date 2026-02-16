@@ -25,7 +25,10 @@ class SpriteManager:
             "idle right": [16],
             "walk right": [17, 18, 19],
             "walk left": [10, 11, 12],
-            "jump": [21],
+            "jump right": [21],
+            "jump left": [8],
+            "fall right": [18],
+            "fall left": [11]
         }
 
         self.current_animation = None
