@@ -5,55 +5,47 @@ class SpriteManager:
     def __init__(self, base_folder, scale=1):
         self.frames = {}
         self.scale = scale
-
-        # Load ONLY mario folder
-        mario_path = os.path.join(base_folder, "mario")
+        self.mario_path = os.path.join(base_folder, "mario")
         self.frames["mario"] = []
-        files = [f for f in os.listdir(mario_path) if f.endswith(".png")]
 
-        # Sort numerically by the number in frame_#.png
-        files.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))
+        # load all frames
+        if os.path.exists(self.mario_path):
+            files = [f for f in os.listdir(self.mario_path) if f.endswith(".png")]
+            files.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))  # ensure order
 
-        for file in files:
-            image = pygame.image.load(
-                os.path.join(mario_path, file)
-            ).convert_alpha()
+            for file in files:
+                image = pygame.image.load(os.path.join(self.mario_path, file)).convert_alpha()
+                w, h = image.get_size()
+                image = pygame.transform.scale(image, (w * self.scale, h * self.scale))
+                self.frames["mario"].append(image)
 
-            # Scale using the SAME scale as background
-            width = int(image.get_width() * self.scale)
-            height = int(image.get_height() * self.scale)
-
-            image = pygame.transform.scale(image, (width, height))
-            self.frames["mario"].append(image)
-
-        # ---- Animations ----
+        # define animations using the **indices of the loaded frames**
         self.animations = {
-            "idle left": [("mario", 13)],
-            "idle right": [("mario", 16)],
-            "walk right": [("mario", 17), ("mario", 18), ("mario", 19)],
-            "walk left": [("mario", 10), ("mario", 11), ("mario", 12)],
-            "jump": [("mario", 21)],
+            "idle left": [13],
+            "idle right": [16],
+            "walk right": [17, 18, 19],
+            "walk left": [10, 11, 12],
+            "jump": [21],
         }
 
-        self.frame_index = 0
-        self.animation_speed = 1 / 10  # 10 frames per second
-        self.timer = 0
         self.current_animation = None
+        self.frame_index = 0
+        self.timer = 0
+        self.animation_speed = 0.1
 
     def get_frame(self, animation_type, dt):
+        # change animation type
         if animation_type != self.current_animation:
+            self.current_animation = animation_type
             self.frame_index = 0
             self.timer = 0
-            self.current_animation = animation_type
 
-        animation = self.animations[animation_type]
-
+        frames = self.animations.get(animation_type, self.animations["idle right"])
         self.timer += dt
         if self.timer >= self.animation_speed:
             self.timer = 0
-            self.frame_index += 1
+            self.frame_index = (self.frame_index + 1) % len(frames)
 
-        self.frame_index %= len(animation)
-
-        folder, frame_number = animation[self.frame_index]
-        return self.frames[folder][frame_number]
+        # frames list only has indices for self.frames["mario"]
+        idx = frames[self.frame_index]
+        return self.frames["mario"][idx]

@@ -15,7 +15,7 @@ SCREEN_HEIGHT = GRID_HEIGHT * TILE_SIZE
 
 LEVEL_PATH = os.path.join("levels", "1-1.json")
 
-FLOOR_TILE_ID = 1
+FLOOR_TILE_ID = 4
 DOUBLE_TAP_TIME = 300  # ms
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
