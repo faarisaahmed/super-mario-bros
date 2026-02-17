@@ -24,8 +24,10 @@
       "frames": [
         "question1.png",
         "question2.png",
-        "question3.png"
+        "question3.png",
+        "question2.png"
       ],
+      "frame_durations": [24, 7, 8, 7],
       "solid": true,
       "animated": true
     },

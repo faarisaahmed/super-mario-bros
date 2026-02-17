@@ -25,12 +25,13 @@ sprites = SpriteManager("sprites", SCALE)
 level = Level("levels/1-1.json", "tileset.json")
 
 # mario
-mario = Mario(x=100, y=0, scale=SCALE)  # start at y=0, he will fall onto floor blocks
+mario = Mario(x=100, y=0, scale=SCALE)
 
 camera_x = 0
 
 running = True
 while running:
+    # dt is the time passed since the last frame in seconds
     dt = clock.tick(FPS) / 1000
 
     for event in pygame.event.get():
@@ -52,7 +53,11 @@ while running:
 
     # draw
     screen.fill((92, 148, 252))
-    level.draw(screen, camera_x, SCALE)
+    
+    # --- UPDATED LINE ---
+    # We pass 'dt' so the tiles can update their animation frames
+    level.draw(screen, dt, camera_x, SCALE)
+    
     mario.draw(screen, sprites, camera_x, dt)
 
     pygame.display.flip()
