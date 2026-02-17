@@ -7,7 +7,7 @@ pygame.mixer.init()
 # Increasing channels prevents sounds from cutting each other off
 pygame.mixer.set_num_channels(16)
 
-jump_sound = pygame.mixer.Sound(os.path.join("sfx", "jump_effect.mp3"))
+jump_sound = pygame.mixer.Sound(os.path.join("sfx", "jump_effect.ogg"))
 
 # --- VOLUME CONTROL ---
 # 0.0 is silent, 1.0 is full blast. 0.2 is usually the "sweet spot" for SFX.

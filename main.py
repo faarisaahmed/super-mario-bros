@@ -15,7 +15,7 @@ clock = pygame.time.Clock()
 FPS = 60
 
 # music
-music_path = os.path.join("music", "overworld1_mario.mp3")
+music_path = os.path.join("music", "overworld1_mario.ogg")
 pygame.mixer.music.load(music_path)
 pygame.mixer.music.set_volume(0.5)
 pygame.mixer.music.play(-1)
