@@ -52,7 +52,7 @@ while running:
             camera_x = level_pixel_width - screen_width
 
     # draw
-    screen.fill((92, 148, 252))
+    screen.fill((192, 148, 252))
     
     # --- UPDATED LINE ---
     # We pass 'dt' so the tiles can update their animation frames
