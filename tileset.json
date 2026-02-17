@@ -40,6 +40,26 @@
       "name": "square_block",
       "frames": ["square_block.png"],
       "solid": true
-    }
+    },
+      "6": {
+        "name": "pipe_top_left",
+        "frames": ["pipe_top_left.png"],
+        "solid": true
+      },
+      "7": {
+        "name": "pipe_top_right",
+        "frames": ["pipe_top_right.png"],
+        "solid": true
+      },
+      "8": {
+        "name": "pipe_left",
+        "frames": ["pipe_left.png"],
+        "solid": true
+      },
+      "9": {
+        "name": "pipe_right",
+        "frames": ["pipe_right.png"],
+        "solid": true
+      }
   }
 }

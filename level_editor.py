@@ -88,6 +88,14 @@ while running:
                 current_tile_id = 4
             elif event.key == pygame.K_5:
                 current_tile_id = 5
+            elif event.key == pygame.K_6:
+                current_tile_id = 6
+            elif event.key == pygame.K_7:
+                current_tile_id = 7
+            elif event.key == pygame.K_8:
+                current_tile_id = 8
+            elif event.key == pygame.K_9:
+                current_tile_id = 9
 
             # Save
             elif event.key == pygame.K_s:
