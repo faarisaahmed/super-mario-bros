@@ -1,4 +1,4 @@
-name: Build pygbag game
+name: Build pygbag game 
 
 on:
   push:
