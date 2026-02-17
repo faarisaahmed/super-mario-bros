@@ -35,6 +35,11 @@
       "name": "floor",
       "frames": ["floor.png"],
       "solid": true
+    },
+    "5": {
+      "name": "square_block",
+      "frames": ["square_block.png"],
+      "solid": true
     }
   }
 }
