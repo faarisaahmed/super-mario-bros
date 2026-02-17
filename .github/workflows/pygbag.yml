@@ -21,7 +21,7 @@ jobs:
       run: pip install pygbag
 
     - name: Build with pygbag
-      run: pygbag super-mario-bros
+      run: pygbag ./super-mario-bros
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
