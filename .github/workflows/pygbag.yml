@@ -21,7 +21,10 @@ jobs:
       run: pip install pygbag==0.8.5
 
     - name: Build with pygbag
-      run: pygbag .
+      run: |
+        # --build: tells pygbag to just package the files
+        # --no_server: stops it from starting the web server that hangs the action
+        python3 -m pygbag --build --no_server .
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
