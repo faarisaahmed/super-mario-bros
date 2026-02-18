@@ -23,48 +23,54 @@ clock = pygame.time.Clock()
 FONT = pygame.font.SysFont(None, 24)
 
 # --- Flagpole Object Data ---
-flagpoles = [] # Stores X-coordinates (in tile units)
+flagpoles = [] 
 input_active = False
 input_text = ""
-last_f_press = 0  # To track double-tap for removal
+last_f_press = 0  
+last_c_press = 0
 
 # --- Camera ---
 camera_x = 0
 
 # --- Load tileset ---
-with open("tileset.json", "r") as f:
-    tileset = json.load(f)
-tiles = tileset["tiles"]
+# (Assumes tileset.json and sprites/tiles/ exist as per your original setup)
 tile_images = {}
-for tile_id, tile_data in tiles.items():
-    frames = tile_data["frames"]
-    if frames:
-        image_path = os.path.join("sprites", "tiles", frames[0])
-        if os.path.exists(image_path):
-            image = pygame.image.load(image_path).convert_alpha()
-            tile_images[int(tile_id)] = image
+try:
+    with open("tileset.json", "r") as f:
+        tileset = json.load(f)
+    tiles = tileset["tiles"]
+    for tile_id, tile_data in tiles.items():
+        frames = tile_data["frames"]
+        if frames:
+            image_path = os.path.join("sprites", "tiles", frames[0])
+            if os.path.exists(image_path):
+                image = pygame.image.load(image_path).convert_alpha()
+                tile_images[int(tile_id)] = image
+except FileNotFoundError:
+    print("Warning: tileset.json not found.")
 
 # --- Load or create level ---
+level = [[0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
+
 if os.path.exists(LEVEL_PATH):
     with open(LEVEL_PATH, "r") as f:
         data = json.load(f)
-        loaded_tiles = data["tiles"] if "tiles" in data else data
-        flagpoles = data.get("objects", {}).get("flagpoles", [])
+        # Handle both old list-style and new dict-style saves
+        loaded_tiles = data["tiles"] if isinstance(data, dict) and "tiles" in data else data
+        if isinstance(data, dict):
+            flagpoles = data.get("objects", {}).get("flagpoles", [])
     
-    level = [[0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
+    # Fill existing level data
     for y in range(min(GRID_HEIGHT, len(loaded_tiles))):
         for x in range(min(GRID_WIDTH, len(loaded_tiles[y]))):
             level[y][x] = loaded_tiles[y][x]
 else:
-    level = [[0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-
-# Enforce floor
-for row in range(GRID_HEIGHT - 2, GRID_HEIGHT):
-    for col in range(GRID_WIDTH):
-        level[row][col] = FLOOR_TILE_ID
+    # FIRST TIME RUN: Generate default floor
+    for row in range(GRID_HEIGHT - 2, GRID_HEIGHT):
+        for col in range(GRID_WIDTH):
+            level[row][col] = FLOOR_TILE_ID
 
 current_tile_id = FLOOR_TILE_ID
-last_c_press = 0
 
 running = True
 while running:
@@ -77,18 +83,15 @@ while running:
         # --- Flagpole Input Handling ---
         if input_active:
             if event.type == pygame.KEYDOWN:
-                # We handle the 'F' key within input_active to catch the double-tap
                 if event.key == pygame.K_f:
                     now = pygame.time.get_ticks()
                     if now - last_f_press <= DOUBLE_TAP_TIME:
-                        # Double tap detected: Remove nearest flagpole
+                        # Double tap: Remove nearest
                         center_tile_x = (camera_x + SCREEN_WIDTH // 2) // TILE_SIZE
                         if flagpoles:
                             closest_flag = min(flagpoles, key=lambda fx: abs(fx - center_tile_x))
-                            # Only remove if it's within current screen view
                             if abs(closest_flag - center_tile_x) < (VISIBLE_TILES_X // 2):
                                 flagpoles.remove(closest_flag)
-                                print(f"Removed flagpole at tile {closest_flag}")
                         input_active = False
                         input_text = ""
                         last_f_press = now
@@ -111,15 +114,17 @@ while running:
             continue 
 
         if event.type == pygame.KEYDOWN:
+            # Add Flagpole toggle
             if event.key == pygame.K_f:
                 now = pygame.time.get_ticks()
-                # If they tap F while input is NOT active (very first tap)
                 input_active = True
                 last_f_press = now
             
-            elif event.key >= pygame.K_0 and event.key <= pygame.K_9:
+            # Select Tile
+            elif pygame.K_0 <= event.key <= pygame.K_9:
                 current_tile_id = int(event.unicode)
 
+            # Save Level
             elif event.key == pygame.K_s:
                 os.makedirs("levels", exist_ok=True)
                 with open(LEVEL_PATH, "w") as f:
@@ -129,16 +134,19 @@ while running:
                         "tiles": level,
                         "objects": {"flagpoles": flagpoles}
                     }, f, indent=4)
-                print("Level saved with Flagpoles")
+                print("Level saved.")
 
+            # CLEAR LEVEL (Adds floor back)
             elif event.key == pygame.K_c:
                 now = pygame.time.get_ticks()
                 if now - last_c_press <= DOUBLE_TAP_TIME:
                     level = [[0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
                     flagpoles = []
+                    # Re-add floor on clear
                     for row in range(GRID_HEIGHT - 2, GRID_HEIGHT):
                         for col in range(GRID_WIDTH):
                             level[row][col] = FLOOR_TILE_ID
+                    print("Level cleared to default floor.")
                 last_c_press = now
 
     # --- Camera movement ---
@@ -162,7 +170,7 @@ while running:
     # --- Draw ---
     screen.fill((30, 30, 30))
 
-    # Tiles
+    # Draw Tiles
     for y in range(GRID_HEIGHT):
         for x in range(GRID_WIDTH):
             tile_id = level[y][x]
@@ -171,39 +179,26 @@ while running:
                 if -TILE_SIZE < draw_x < SCREEN_WIDTH:
                     screen.blit(tile_images[tile_id], (draw_x, y * TILE_SIZE))
 
-    # --- Inside the Draw section for Flagpoles ---
+    # Draw Flagpoles
     for fx in flagpoles:
-        # 1. Shift the X-position half a block (8px) to the right
-        # (fx * TILE_SIZE) is the start of the tile, + 8 centers the 16px visual pole 
-        # on the tile boundary or shifts the 32px pole half-way.
         draw_x = (fx * TILE_SIZE) - camera_x + (TILE_SIZE // 2)
-        
-        # 1 block above floor (GRID_HEIGHT-3)
         draw_y = (GRID_HEIGHT - 3) * TILE_SIZE - 152
-        
         if -32 < draw_x < SCREEN_WIDTH:
-            # 2. Cut the box in half vertically for the editor (32px -> 16px)
-            # We show only the "right half" of the original footprint
-            # If the full pole is 32px, showing the right 16px:
-            visual_width = 16 
-            
-            # Draw the 16px wide rectangle
-            pygame.draw.rect(screen, (0, 255, 0), (draw_x + 16, draw_y, visual_width, 152), 2)
-            
-            lbl = FONT.render("FLAG (R-Half)", True, (0, 255, 0))
+            pygame.draw.rect(screen, (0, 255, 0), (draw_x + 16, draw_y, 16, 152), 2)
+            lbl = FONT.render("FLAG", True, (0, 255, 0))
             screen.blit(lbl, (draw_x + 16, draw_y - 20))
             
     # Grid lines
+    offset = camera_x % TILE_SIZE
     for x in range(0, SCREEN_WIDTH + TILE_SIZE, TILE_SIZE):
-        offset = camera_x % TILE_SIZE
         pygame.draw.line(screen, (60, 60, 60), (x - offset, 0), (x - offset, SCREEN_HEIGHT))
     for y in range(0, SCREEN_HEIGHT, TILE_SIZE):
         pygame.draw.line(screen, (60, 60, 60), (0, y), (SCREEN_WIDTH, y))
 
     # UI
-    info_text = f"Selected Tile: {current_tile_id} | F: Add/Remove Flag"
+    info_text = f"Tile: {current_tile_id} | S: Save | Double-C: Clear | F: Flag"
     if input_active:
-        info_text = f"ADD AT X: {input_text}_ (Double-F to Remove Closest)"
+        info_text = f"ADD FLAG AT X: {input_text}_"
     
     ui_surface = FONT.render(info_text, True, (255, 255, 0) if input_active else (255, 255, 255))
     screen.blit(ui_surface, (10, 10))
