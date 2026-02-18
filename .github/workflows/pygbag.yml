@@ -24,7 +24,7 @@ jobs:
       run: |
         # --build: tells pygbag to just package the files
         # --no_server: stops it from starting the web server that hangs the action
-        python3 -m pygbag --build --no_server .
+        python3 -m pygbag --build .
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
