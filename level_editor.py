@@ -111,10 +111,12 @@ while running:
 
         if event.type == pygame.KEYDOWN:
             # --- ZXVBNM Mapping (Switches to Object Brush) ---
+            # --- ZXVBNM Mapping + Hills (Switches to Object Brush) ---
             prop_map = {
-                pygame.K_z: 11, pygame.K_x: 12, 
-                pygame.K_v: 13, pygame.K_b: 14,
-                pygame.K_n: 11, pygame.K_m: 12
+                pygame.K_z: 11, pygame.K_x: 12, # Bushes
+                pygame.K_v: 13, pygame.K_b: 14, # Clouds
+                pygame.K_n: 11, pygame.K_m: 12, # Duplicates for comfort
+                pygame.K_k: 15, pygame.K_l: 16  # Added: Hills
             }
 
             if event.key in prop_map:
@@ -207,6 +209,13 @@ while running:
                 pygame.draw.circle(screen, (0, 255, 0), (draw_x, SCREEN_HEIGHT - 40), 10, 2)
             elif obj_id in [13, 14]:
                 pygame.draw.ellipse(screen, (255, 255, 255), (draw_x - 15, 40, 30, 20), 2)
+            elif obj_id in [15, 16]:
+                points = [
+                    (draw_x - 20, SCREEN_HEIGHT - 32), 
+                    (draw_x, SCREEN_HEIGHT - 60), 
+                    (draw_x + 20, SCREEN_HEIGHT - 32)
+                ]
+                pygame.draw.polygon(screen, (34, 139, 34), points, 2)
             
     # Grid lines
     offset = camera_x % TILE_SIZE

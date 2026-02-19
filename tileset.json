@@ -97,6 +97,22 @@
       "is_object": true,
       "width": 64,
       "height": 24
-    }
+    },
+      "15": {
+        "name": "small_hill",
+        "frames": ["small_hill.png"],
+        "solid": false,
+        "is_object": true,
+        "width": 48,
+        "height": 24
+      },
+      "16": {
+        "name": "big_hill",
+        "frames": ["big_hill.png"],
+        "solid": false,
+        "is_object": true,
+        "width": 80,
+        "height": 36
+      }
   }
 }

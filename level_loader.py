@@ -108,10 +108,11 @@ class Level:
                 if "cloud" in info["name"]:
                     # Clouds float high (adjust -12 as needed)
                     draw_y = (self.height - 12) * self.tile_size * scale
-                else:
+                elif "hill" in info["name"]:
                     # Ground level for Flagpole and Bushes (above floor tiles at height - 2)
                     draw_y = (self.height - 2) * self.tile_size * scale - h
-                
+                else:
+                    draw_y = (self.height - 2) * self.tile_size * scale - h
                 surface.blit(scaled_img, (draw_x, draw_y))
 
     def get_solid_tiles(self, scale=1):
