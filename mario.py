@@ -4,13 +4,9 @@ import os
 
 # --- 1. INITIALIZE MIXER AND LOAD SOUND ---
 pygame.mixer.init()
-# Increasing channels prevents sounds from cutting each other off
 pygame.mixer.set_num_channels(16)
 
 jump_sound = pygame.mixer.Sound(os.path.join("sfx", "jump_effect.ogg"))
-
-# --- VOLUME CONTROL ---
-# 0.0 is silent, 1.0 is full blast. 0.2 is usually the "sweet spot" for SFX.
 jump_sound.set_volume(0.1) 
 
 class Mario:
@@ -63,8 +59,6 @@ class Mario:
                 self.velocity_y = self.jump_force
                 self.on_ground = False
                 self.y -= 2 
-                
-                # Triggers the quieter sound
                 jump_sound.play()
                 
             self.z_was_pressed = True
@@ -76,6 +70,12 @@ class Mario:
     def update(self, dt, camera_x, solid_tiles):
         # Horizontal Movement & Collision
         self.x += self.velocity_x * dt
+
+        # --- CAMERA LEFT WALL CONSTRAINT ---
+        if self.x < camera_x:
+            self.x = float(camera_x)
+        # ------------------------------------
+
         mario_rect = self.rect()
         for tile in solid_tiles:
             if mario_rect.colliderect(tile):
