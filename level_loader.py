@@ -61,7 +61,11 @@ class Level:
         for row in range(self.height):
             for col in range(self.width):
                 tile_id = self.grid[row][col]
-                if tile_id != 0 and tile_id != 10 and tile_id in self.tile_images:
+                # Skip air (0) and any tile marked as an object (like ID 10-14)
+                tile_info = self.tileset.get(str(tile_id))
+                is_obj = tile_info.get("is_object", False) if tile_info else False
+
+                if tile_id != 0 and not is_obj and tile_id in self.tile_images:
                     img_list = self.tile_images[tile_id]
                     if len(img_list) > 1:
                         frame_idx = self.get_animated_frame_index(tile_id)
@@ -78,25 +82,37 @@ class Level:
                     )
                     surface.blit(tile_image, (x, y))
 
-        # --- 2. Draw Flagpole Objects ---
-        for fx in self.flagpoles:
-            if 10 in self.tile_images and len(self.tile_images[10]) > 0:
-                flag_img = self.tile_images[10][0]
+        # --- 2. Draw Objects (Flagpoles, Bushes, Clouds) ---
+        for obj in self.flagpoles:
+            # Handle both legacy format [x] and new format [x, id]
+            if isinstance(obj, list):
+                fx, obj_id = obj[0], obj[1]
+            else:
+                fx, obj_id = obj, 10 # Default to flagpole ID
+            
+            str_id = str(obj_id)
+            if obj_id in self.tile_images and len(self.tile_images[obj_id]) > 0:
+                obj_img = self.tile_images[obj_id][0]
                 
-                info = self.tileset["10"]
+                # Metadata from the tileset
+                info = self.tileset[str_id]
                 w = info["width"] * scale
                 h = info["height"] * scale
                 
-                scaled_flag = pygame.transform.scale(flag_img, (int(w), int(h)))
+                scaled_img = pygame.transform.scale(obj_img, (int(w), int(h)))
                 
-                # SHIFT LOGIC: fx * tile_size starts the tile. 
-                # Adding (self.tile_size // 2) * scale moves it half a block right.
-                draw_x = (fx * self.tile_size * scale) - camera_x + (self.tile_size // 2 * scale)
+                # CENTER LOGIC: (column * size) + (half tile) - (half sprite width)
+                draw_x = (fx * self.tile_size * scale) - camera_x + (self.tile_size // 2 * scale) - (w // 2)
                 
-                # Y POSITION: GRID_HEIGHT - 3 (one block gap above floor)
-                draw_y = (self.height - 3) * self.tile_size * scale - h
+                # Y POSITION:
+                if "cloud" in info["name"]:
+                    # Clouds float high (adjust -12 as needed)
+                    draw_y = (self.height - 12) * self.tile_size * scale
+                else:
+                    # Ground level for Flagpole and Bushes (above floor tiles at height - 2)
+                    draw_y = (self.height - 2) * self.tile_size * scale - h
                 
-                surface.blit(scaled_flag, (draw_x, draw_y))
+                surface.blit(scaled_img, (draw_x, draw_y))
 
     def get_solid_tiles(self, scale=1):
         solids = []

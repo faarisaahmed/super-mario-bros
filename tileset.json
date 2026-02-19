@@ -65,6 +65,38 @@
       "is_object": true,
       "width": 32,
       "height": 152
+    },
+    "11": {
+      "name": "small_bush",
+      "frames": ["small_bush.png"],
+      "solid": false,
+      "is_object": true,
+      "width": 32,
+      "height": 16
+    },
+    "12": {
+      "name": "big_bush",
+      "frames": ["big_bush.png"],
+      "solid": false,
+      "is_object": true,
+      "width": 64,
+      "height": 16
+    },
+    "13": {
+      "name": "small_cloud",
+      "frames": ["small_cloud.png"],
+      "solid": false,
+      "is_object": true,
+      "width": 32,
+      "height": 24
+    },
+    "14": {
+      "name": "big_cloud",
+      "frames": ["big_cloud.png"],
+      "solid": false,
+      "is_object": true,
+      "width": 64,
+      "height": 24
     }
   }
 }
