@@ -6,6 +6,13 @@ from mario import Mario
 
 pygame.init()
 pygame.mixer.init()
+pygame.joystick.init()
+
+controller = None
+if pygame.joystick.get_count() > 0:
+    controller = pygame.joystick.Joystick(0)
+    controller.init()
+    print("Controller connected:", controller.get_name())
 
 SCALE = 3
 BASE_WIDTH, BASE_HEIGHT = 256, 240
@@ -31,7 +38,6 @@ camera_x = 0
 
 running = True
 while running:
-    # dt is the time passed since the last frame in seconds
     dt = clock.tick(FPS) / 1000
 
     for event in pygame.event.get():
@@ -40,7 +46,7 @@ while running:
 
     keys = pygame.key.get_pressed()
 
-    mario.handle_input(keys)
+    mario.handle_input(keys, controller)
     solid_tiles = level.get_solid_tiles(SCALE)
     mario.update(dt, camera_x, solid_tiles)
 
@@ -54,10 +60,7 @@ while running:
     # draw
     screen.fill((92, 148, 252))
     
-    # --- UPDATED LINE ---
-    # We pass 'dt' so the tiles can update their animation frames
     level.draw(screen, dt, camera_x, SCALE)
-    
     mario.draw(screen, sprites, camera_x, dt)
 
     pygame.display.flip()

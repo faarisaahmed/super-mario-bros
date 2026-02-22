@@ -2,12 +2,11 @@ import pygame
 import math
 import os
 
-# --- 1. INITIALIZE MIXER AND LOAD SOUND ---
 pygame.mixer.init()
 pygame.mixer.set_num_channels(16)
 
 jump_sound = pygame.mixer.Sound(os.path.join("sfx", "jump_effect.ogg"))
-jump_sound.set_volume(0.1) 
+jump_sound.set_volume(0.1)
 
 class Mario:
     def __init__(self, x, y, scale):
@@ -21,13 +20,11 @@ class Mario:
         self.direction = "right"
         self.current_animation = "idle right"
 
-        # Physics
         self.velocity_x = 0
         self.velocity_y = 0
         self.on_ground = False
         self.z_was_pressed = False 
 
-        # --- TUNING ---
         self.gravity = 800 * self.scale  
         
         target_max_height = 70 * self.scale
@@ -44,17 +41,51 @@ class Mario:
                            int(self.width * self.scale), 
                            int(self.height * self.scale))
 
-    def handle_input(self, keys):
+    def handle_input(self, keys, controller=None):
         self.velocity_x = 0
+
+        move_left = False
+        move_right = False
+        jump_pressed = False
+
+        # --- KEYBOARD ---
         if keys[pygame.K_RIGHT]:
+            move_right = True
+        if keys[pygame.K_LEFT]:
+            move_left = True
+        if keys[pygame.K_z]:
+            jump_pressed = True
+
+        # --- CONTROLLER ---
+        if controller:
+            # D-Pad (mapped as buttons on your system)
+            if controller.get_button(13):  # D-pad left
+                move_left = True
+            if controller.get_button(14):  # D-pad right
+                move_right = True
+
+            # Left joystick
+            if controller.get_numaxes() > 0:
+                axis_x = controller.get_axis(0)
+                if axis_x < -0.5:
+                    move_left = True
+                if axis_x > 0.5:
+                    move_right = True
+
+            # A button only
+            if controller.get_button(0):  # A
+                jump_pressed = True
+
+        # --- APPLY MOVEMENT ---
+        if move_right:
             self.velocity_x = self.horizontal_speed
             self.direction = "right"
-        elif keys[pygame.K_LEFT]:
+        elif move_left:
             self.velocity_x = -self.horizontal_speed
             self.direction = "left"
 
-        # Jump Input
-        if keys[pygame.K_z]:
+        # --- JUMP LOGIC ---
+        if jump_pressed:
             if not self.z_was_pressed and self.on_ground:
                 self.velocity_y = self.jump_force
                 self.on_ground = False
@@ -68,13 +99,10 @@ class Mario:
             self.z_was_pressed = False
 
     def update(self, dt, camera_x, solid_tiles):
-        # Horizontal Movement & Collision
         self.x += self.velocity_x * dt
 
-        # --- CAMERA LEFT WALL CONSTRAINT ---
         if self.x < camera_x:
             self.x = float(camera_x)
-        # ------------------------------------
 
         mario_rect = self.rect()
         for tile in solid_tiles:
@@ -86,13 +114,11 @@ class Mario:
                 self.velocity_x = 0
                 mario_rect = self.rect()
 
-        # Vertical Movement
         self.velocity_y += self.gravity * dt
         if self.velocity_y > self.terminal_velocity:
             self.velocity_y = self.terminal_velocity
         self.y += self.velocity_y * dt
         
-        # Collision Resolution
         mario_rect = self.rect()
         for tile in solid_tiles:
             if mario_rect.colliderect(tile):
@@ -104,7 +130,6 @@ class Mario:
                     self.velocity_y = 0
                 mario_rect = self.rect()
 
-        # GROUNDED CHECK
         ground_sensor = pygame.Rect(int(self.x), int(self.y + 1), 
                                    int(self.width * self.scale), 
                                    int(self.height * self.scale))
@@ -115,7 +140,6 @@ class Mario:
                 self.on_ground = True
                 break
 
-        # Animation State
         if not self.on_ground:
             self.current_animation = f"jump {self.direction}"
         elif self.velocity_x != 0:
