@@ -13,6 +13,8 @@ class Level:
         
         self.grid = level_data["tiles"] if isinstance(level_data.get("tiles"), list) else level_data
         self.flagpoles = level_data.get("objects", {}).get("flagpoles", [])
+        # Goomba spawn points, each stored as [grid_x, grid_y].
+        self.goombas = level_data.get("objects", {}).get("goombas", [])
 
         # 2. Load tileset configuration
         with open(tileset_path, "r") as f:
@@ -53,6 +55,19 @@ class Level:
             if current_time < elapsed:
                 return i
         return 0
+
+    def solid_at(self, col, row):
+        """Whether the tile at a grid cell is solid.
+
+        This is what the original's collision needs: it samples individual
+        pixels and asks what metatile is there, rather than intersecting
+        rectangles. Anything off the grid is empty, except below the bottom,
+        which stays empty so falling out of the level keeps working.
+        """
+        if row < 0 or row >= self.height or col < 0 or col >= self.width:
+            return False
+        tile_info = self.tileset.get(str(self.grid[row][col]))
+        return bool(tile_info and tile_info.get("solid", False))
 
     def draw(self, surface, dt, camera_x=0, scale=1):
         self.animation_timer += dt

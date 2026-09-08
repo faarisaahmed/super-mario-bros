@@ -205,3 +205,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# NES ROMs -- keep cartridge dumps out of the repo
+*.nes
+*.fds
+
+# emulator traces from tools/smb_trace.lua
+smb_trace*.csv

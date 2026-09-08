@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super Mario Bros AI</title>
+<style>
+  :root { --nes-red:#e52521; --nes-blue:#5c94fc; --nes-yellow:#fbd000; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Courier New", monospace;
+    background: var(--nes-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+  }
+  .card {
+    background: rgba(0,0,0,0.55);
+    border: 4px solid #fff;
+    border-radius: 10px;
+    padding: 40px 48px;
+    max-width: 520px;
+    width: 100%;
+    box-shadow: 0 0 0 4px #000, 8px 8px 0 rgba(0,0,0,0.35);
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 30px;
+    letter-spacing: 2px;
+    color: var(--nes-yellow);
+    text-shadow: 3px 3px 0 #000;
+  }
+  .sub { margin: 0 0 28px; font-size: 13px; opacity: .85; }
+  .buttons { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+  button {
+    font-family: inherit;
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #fff;
+    border: 3px solid #000;
+    border-radius: 8px;
+    padding: 18px 30px;
+    min-width: 150px;
+    cursor: pointer;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
+    transition: transform .05s ease;
+  }
+  button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 rgba(0,0,0,0.4); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  #playBtn  { background: var(--nes-red); }
+  #watchBtn { background: #6a2ec7; }
+  #trainBtn { background: #33a532; }
+  #stopBtn  { background: #b02418; display: none; }
+  #status {
+    margin-top: 26px;
+    min-height: 24px;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  /* progress bar */
+  #progressWrap {
+    display: none;
+    margin-top: 20px;
+    height: 20px;
+    border: 3px solid #000;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+  #progressBar {
+    height: 100%;
+    width: 0%;
+    background: var(--nes-yellow);
+    transition: width .4s ease;
+  }
+  #progressLabel { margin-top: 6px; font-size: 12px; opacity: .9; }
+  /* stats table */
+  #statsWrap { display: none; margin-top: 20px; }
+  table.stats {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  table.stats td {
+    border: 1px solid rgba(255,255,255,0.25);
+    padding: 5px 8px;
+    text-align: left;
+  }
+  table.stats td.k { opacity: .8; }
+  table.stats td.v { text-align: right; font-weight: bold; color: var(--nes-yellow); }
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 3px solid rgba(255,255,255,0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hint { margin-top: 22px; font-size: 11px; opacity: .7; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>SUPER MARIO BROS</h1>
+    <p class="sub">Do you want to play, or train the AI?</p>
+
+    <div class="buttons">
+      <button id="playBtn">▶ PLAY</button>
+      <button id="watchBtn">🤖 WATCH AI</button>
+      <button id="trainBtn">⚙ TRAIN</button>
+      <button id="stopBtn">■ STOP</button>
+    </div>
+
+    <div id="status"></div>
+
+    <div id="progressWrap"><div id="progressBar"></div></div>
+    <div id="progressLabel"></div>
+
+    <div id="statsWrap">
+      <table class="stats"><tbody id="statsBody"></tbody></table>
+    </div>
+
+    <p class="hint">The game and the AI open in their own windows on your desktop.</p>
+  </div>
+
+<script>
+  const statusEl   = document.getElementById("status");
+  const playBtn    = document.getElementById("playBtn");
+  const watchBtn   = document.getElementById("watchBtn");
+  const trainBtn   = document.getElementById("trainBtn");
+  const stopBtn    = document.getElementById("stopBtn");
+  const progWrap   = document.getElementById("progressWrap");
+  const progBar    = document.getElementById("progressBar");
+  const progLabel  = document.getElementById("progressLabel");
+  const statsWrap  = document.getElementById("statsWrap");
+  const statsBody  = document.getElementById("statsBody");
+  let polling = null;
+
+  // Friendlier labels for the SB3 metric keys.
+  const LABELS = {
+    total_timesteps: "Timesteps",
+    ep_rew_mean: "Reward (mean)",
+    ep_len_mean: "Episode length",
+    fps: "FPS",
+    iterations: "Iterations",
+    time_elapsed: "Elapsed (s)",
+    approx_kl: "Approx KL",
+    clip_fraction: "Clip fraction",
+    entropy_loss: "Entropy loss",
+    explained_variance: "Explained var",
+    learning_rate: "Learning rate",
+    loss: "Loss",
+    policy_gradient_loss: "Policy grad loss",
+    value_loss: "Value loss",
+    n_updates: "Updates",
+  };
+  const ORDER = Object.keys(LABELS);
+
+  function setStatus(html) { statusEl.innerHTML = html; }
+
+  function showTrainingUI(on) {
+    stopBtn.style.display   = on ? "inline-block" : "none";
+    progWrap.style.display  = on ? "block" : "none";
+    statsWrap.style.display = on ? "block" : "none";
+    trainBtn.disabled = on;
+    playBtn.disabled  = on;
+  }
+
+  function renderStats(stats, target) {
+    const keys = Object.keys(stats || {});
+    if (!keys.length) return;
+
+    // Progress bar from timesteps / target.
+    const ts = parseFloat(stats.total_timesteps);
+    if (!isNaN(ts) && target) {
+      const pct = Math.min(100, (ts / target) * 100);
+      progBar.style.width = pct + "%";
+      progLabel.textContent =
+        `${ts.toLocaleString()} / ${target.toLocaleString()} timesteps (${pct.toFixed(1)}%)`;
+    }
+
+    // Table: known metrics first (in a sensible order), then any extras.
+    const shown = ORDER.filter(k => k in stats)
+                       .concat(keys.filter(k => !(k in LABELS)));
+    statsBody.innerHTML = shown.map(k =>
+      `<tr><td class="k">${LABELS[k] || k}</td><td class="v">${stats[k]}</td></tr>`
+    ).join("");
+  }
+
+  playBtn.addEventListener("click", async () => {
+    setStatus("Launching the game window…");
+    try {
+      await fetch("/play", { method: "POST" });
+      setStatus("🎮 Game launched! Use the arrow keys to move and <b>Z</b> to jump.");
+    } catch (e) {
+      setStatus("Couldn't reach the launcher. Is <code>server.py</code> running?");
+    }
+  });
+
+  watchBtn.addEventListener("click", async () => {
+    setStatus("Loading the best trained model…");
+    try {
+      const res = await fetch("/watch", { method: "POST" });
+      const r = await res.json();
+      if (r.result === "ok") {
+        setStatus("🤖 The best trained model is now playing in its own window.");
+      } else if (r.result === "no_model") {
+        setStatus("No trained model yet — press <b>⚙ TRAIN</b> first to create one.");
+      } else if (r.result === "training") {
+        setStatus("Training is in progress — it'll play automatically when done.");
+      }
+    } catch (e) {
+      setStatus("Couldn't reach the launcher. Is <code>server.py</code> running?");
+    }
+  });
+
+  trainBtn.addEventListener("click", async () => {
+    showTrainingUI(true);
+    setStatus('<span class="spinner"></span> Training… you can watch the stats below, or press STOP.');
+    try {
+      await fetch("/train", { method: "POST" });
+      polling = setInterval(checkStatus, 2000);
+    } catch (e) {
+      setStatus("Couldn't reach the launcher. Is <code>server.py</code> running?");
+      showTrainingUI(false);
+    }
+  });
+
+  stopBtn.addEventListener("click", async () => {
+    stopBtn.disabled = true;
+    setStatus("Stopping training…");
+    try { await fetch("/stop", { method: "POST" }); } catch (e) {}
+  });
+
+  function finish(msg) {
+    clearInterval(polling);
+    showTrainingUI(false);
+    stopBtn.disabled = false;
+    setStatus(msg);
+  }
+
+  async function checkStatus() {
+    try {
+      const res = await fetch("/status");
+      const s = await res.json();
+      renderStats(s.stats, s.target);
+
+      if (s.mode === "watching") {
+        finish("✅ Training complete! The best model is now playing in its own window.");
+      } else if (s.mode === "stopped") {
+        finish("⏹ Training stopped. The best model saved so far is kept on disk.");
+      } else if (s.mode === "error") {
+        finish("⚠️ Training stopped with an error. Check the launcher console.");
+      }
+    } catch (e) { /* transient; keep polling */ }
+  }
+</script>
+</body>
+</html>

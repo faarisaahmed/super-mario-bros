@@ -28,7 +28,11 @@ class SpriteManager:
             "jump right": [21],
             "jump left": [8],
             "fall right": [18],
-            "fall left": [11]
+            "fall left": [11],
+            "death": [29],
+            # the pose he holds while bouncing off a stomped goomba
+            "stomp right": [18],
+            "stomp left": [11]
         }
 
         self.current_animation = None
