@@ -4,14 +4,55 @@ import pygame
 
 import smb_physics as smb
 
-pygame.mixer.init()
-pygame.mixer.set_num_channels(16)
 
-jump_sound = pygame.mixer.Sound(os.path.join("sfx", "jump_effect.ogg"))
-jump_sound.set_volume(0.1)
 
-death_sound = pygame.mixer.Sound(os.path.join("music", "deathsound.mp3"))
-death_sound.set_volume(0.5)
+class _Silence:
+    """Stand-in for a Sound that could not be loaded.
+
+    Browsers hand pygame a mixer that may refuse to initialise until the
+    first user gesture, and the WebAssembly SDL_mixer has no mp3 decoder, so
+    audio has to be allowed to simply not exist. The game is fully playable
+    without it; crashing on import is not an option.
+    """
+
+    def play(self, *a, **kw):
+        return None
+
+    def stop(self, *a, **kw):
+        return None
+
+    def set_volume(self, *a, **kw):
+        return None
+
+
+def _load_sound(*candidates, volume=1.0):
+    """First candidate path that both exists and decodes. Ogg is listed
+    before mp3 because it is the format that survives the wasm build."""
+    for path in candidates:
+        if not os.path.exists(path):
+            continue
+        try:
+            sound = pygame.mixer.Sound(path)
+        except pygame.error:
+            continue
+        sound.set_volume(volume)
+        return sound
+    return _Silence()
+
+
+try:
+    pygame.mixer.init()
+    pygame.mixer.set_num_channels(16)
+except pygame.error:
+    pass
+
+jump_sound = _load_sound(os.path.join("sfx", "jump_effect.ogg"), volume=0.1)
+
+death_sound = _load_sound(
+    os.path.join("music", "deathsound.ogg"),
+    os.path.join("music", "deathsound.mp3"),
+    volume=0.5,
+)
 
 # Player_State values, same meaning as the original (JumpEngine dispatch,
 # smbdis.asm:5511). Climbing is not implemented here.
@@ -284,7 +325,10 @@ class Mario:
 
         # The overworld track cuts out the instant he is hit, leaving the
         # death jingle alone.
-        pygame.mixer.music.stop()
+        try:
+            pygame.mixer.music.stop()
+        except pygame.error:
+            pass
         death_sound.play()
 
     # -- physics ------------------------------------------------------------
