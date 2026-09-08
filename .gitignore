@@ -212,3 +212,6 @@ __marimo__/
 
 # emulator traces from tools/smb_trace.lua
 smb_trace*.csv
+
+# macOS
+.DS_Store
