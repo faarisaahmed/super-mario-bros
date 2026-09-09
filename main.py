@@ -10,10 +10,12 @@ Two modes, chosen from the title screen:
   PLAY      keyboard/touch control, goombas active — the normal game.
   WATCH AI  the PPO policy from `ai/policy.json` drives Mario.
 
-AI mode deliberately runs the level without goombas. The policy's 16 inputs
-(see mario_ai.MarioSenses.observe) describe terrain only — it was never shown
-an enemy and has no way to perceive one — so putting goombas in front of it
-would be showing off a handicap rather than the model.
+Both modes play the same level, goombas and all. That used to be untrue: the
+old policy's inputs described terrain only, so it had no way to perceive an
+enemy and AI mode ran the level empty. Five of the 26 inputs it now gets are
+about the nearest two goombas (see mario_ai.MarioSenses.observe), and the
+reward pays for a stomp and ends the episode on a hit, so it is playing the
+same game you are.
 """
 
 import asyncio
@@ -109,22 +111,19 @@ senses = MarioSenses()
 
 # ── world ─────────────────────────────────────────────────────────────
 class World:
-    """One attempt at the level. `with_goombas` is what separates a human
-    run from the enemy-free conditions the policy was trained under."""
+    """One attempt at the level, played the same way in both modes."""
 
-    def __init__(self, with_goombas):
-        self.with_goombas = with_goombas
+    def __init__(self):
         self.reset()
 
     def reset(self):
         self.mario = Mario(x=100, y=0, scale=SCALE)
-        self.goombas = (
-            [Goomba(gx, gy, level.tile_size, SCALE) for gx, gy in level.goombas]
-            if self.with_goombas
-            else []
-        )
+        self.goombas = [
+            Goomba(gx, gy, level.tile_size, SCALE) for gx, gy in level.goombas
+        ]
         self.camera_x = 0
         self.won = False
+        self.stomps = 0
         senses.reset()
 
     def update_camera(self):
@@ -152,9 +151,16 @@ class World:
             if self.mario.is_descending():
                 goomba.squash()
                 self.mario.stomp()
+                self.stomps += 1
             else:
                 self.mario.die()
             break
+
+    def threats(self):
+        """The goombas the policy is shown -- live ones only. A squashed one
+        cannot hurt anybody, and steering around it would be a tell that the
+        agent is reacting to sprites rather than to danger."""
+        return [g for g in self.goombas if g.is_dangerous()]
 
     def fell_out(self):
         return self.mario.y >= FLOOR_Y
@@ -313,7 +319,7 @@ def draw_hud(mode, world, action, attempts, best_x):
             "WATCHING THE TRAINED MODEL",
             "action: %s" % ACTION_NAMES[action],
             "run %d · x %d · best %d" % (attempts, int(world.mario.x), int(best_x)),
-            "no goombas: the policy sees terrain only",
+            "stomps %d · goombas are live" % world.stomps,
         ]
         color = (255, 240, 160)
     else:
@@ -358,7 +364,7 @@ async def main():
             music_started = False
             world = None
             return
-        world = World(with_goombas=(new_mode == "play"))
+        world = World()
         attempts = 1
         best_x = 0
         win_timer = 0.0
@@ -369,6 +375,20 @@ async def main():
 
     pointers = Pointers()
 
+    # Headless self-test: run AI mode for N frames and exit with a status.
+    # This file calls asyncio.run() at import time, so it cannot be imported
+    # and poked at -- and AI mode is the one path CI would otherwise never
+    # execute, which is where a signature change would surface as a blank
+    # page rather than a failed build.
+    #     MARIO_SELFTEST=900 python3 main.py
+    selftest = int(os.environ.get("MARIO_SELFTEST", 0))
+    if selftest:
+        if policy is None:
+            print("selftest: ai/policy.json missing")
+            raise SystemExit(1)
+        enter("ai")
+
+    frames = 0
     running = True
     while running:
         dt = clock.tick(FPS) / 1000
@@ -417,10 +437,13 @@ async def main():
             # Exactly the env's step order: read on_ground, choose, apply,
             # advance physics, move the camera, then observe.
             was_on_ground = world.mario.on_ground
-            obs = senses.observe(world.mario, level)
-            last_action = policy.act(obs)
-            senses.apply_action(world.mario, level, last_action, was_on_ground)
+            if not world.mario.dying:
+                obs = senses.observe(world.mario, level, world.threats())
+                last_action = policy.act(obs)
+                senses.apply_action(world.mario, level, last_action,
+                                    was_on_ground)
             world.mario.update(AI_DT, world.camera_x, level.solid_at)
+            world.resolve_goombas(AI_DT)
             world.update_camera()
 
             best_x = max(best_x, world.mario.x)
@@ -461,6 +484,14 @@ async def main():
 
         pygame.display.flip()
         await asyncio.sleep(0)
+
+        if selftest:
+            frames += 1
+            if frames >= selftest:
+                print(f"selftest: {frames} frames in AI mode, "
+                      f"x={world.mario.x:.0f} stomps={world.stomps} "
+                      f"runs={attempts} best_x={best_x:.0f}")
+                running = False
 
     pygame.quit()
 

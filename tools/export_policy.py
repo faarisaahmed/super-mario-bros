@@ -25,7 +25,8 @@ from mario_ai import ACTION_SIZE, OBS_SIZE  # noqa: E402
 
 # Same preference order watch_ai.py uses: the best evaluated checkpoint wins
 # over the last one, because training is usually stopped early.
-CANDIDATES = ["best_model/best_model.zip", "mario_model.zip"]
+CANDIDATES = ["best_model_speed/best_model.zip",
+              "best_model/best_model.zip", "mario_model.zip"]
 OUT = os.path.join("ai", "policy.json")
 
 # Keys in the order they are applied. The critic (value_net) is training-time

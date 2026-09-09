@@ -215,3 +215,7 @@ smb_trace*.csv
 
 # macOS
 .DS_Store
+
+# Raw training stdout. The tensorboard runs next to these are the record
+# worth keeping; these are console spam and run to megabytes.
+logs/*.log

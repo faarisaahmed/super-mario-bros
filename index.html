@@ -148,6 +148,15 @@
   // Friendlier labels for the SB3 metric keys.
   const LABELS = {
     total_timesteps: "Timesteps",
+    // What the run is actually judged on. Episode reward is a proxy and a
+    // moving one; these mean the same thing on the first iteration and the
+    // last. See train_ai.ProgressLog.
+    progress_mean: "Level covered (mean)",
+    progress_best: "Level covered (best)",
+    finish_rate: "Clears (from the start)",
+    finish_frames: "Frames to clear",
+    stomps_mean: "Goombas stomped",
+    random_start_prob: "Curriculum: random starts",
     ep_rew_mean: "Reward (mean)",
     ep_len_mean: "Episode length",
     fps: "FPS",
