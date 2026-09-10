@@ -219,3 +219,7 @@ smb_trace*.csv
 # Raw training stdout. The tensorboard runs next to these are the record
 # worth keeping; these are console spam and run to megabytes.
 logs/*.log
+
+# Smoke-test tensorboard runs. The named ones (cold-run-*, *-finetune-*)
+# are the record worth keeping.
+logs/PPO_[3-9]*/

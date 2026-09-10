@@ -47,12 +47,22 @@ N_ENVS = int(os.environ.get("MARIO_ENVS", 8))
 #   MARIO_RESUME=best_model/best_model.zip MARIO_SPEED_BONUS=0.15 \
 #   MARIO_TIME_COST=0.12 MARIO_TIMESTEPS=2000000 python3 train_ai.py
 RESUME = os.environ.get("MARIO_RESUME", "")
-STATS = "logs/vecnormalize.pkl"
+# Reward statistics to restore when resuming, and where this run writes its
+# own. A fine-tune writes beside its own checkpoints for the same reason it
+# does not share best_model/: everything it produces is conditional on a
+# reward it was given on the command line, and dropping that on top of the
+# cold run's artifacts would silently restore the wrong normaliser -- and
+# the wrong final checkpoint -- to the next run that resumes.
+STATS_IN = os.environ.get("MARIO_STATS", "logs/vecnormalize.pkl")
 # Where EvalCallback keeps the best checkpoint. A fine-tune writes somewhere
 # else by default so a run that trades away reliability for speed cannot
 # overwrite the policy it started from.
 BEST_DIR = os.environ.get(
     "MARIO_BEST_DIR", "./best_model_speed/" if RESUME else "./best_model/")
+STATS_OUT = (os.path.join(BEST_DIR, "vecnormalize.pkl") if RESUME
+             else "logs/vecnormalize.pkl")
+FINAL_OUT = (os.path.join(BEST_DIR, "final_model") if RESUME
+             else "mario_model")
 SPEED_BONUS = float(os.environ.get("MARIO_SPEED_BONUS", 0.05))
 TIME_COST = float(os.environ.get("MARIO_TIME_COST", 0.05))
 
@@ -63,9 +73,19 @@ CURRICULUM_FRACTION = 0.6
 START_RANDOM_PROB = 0.5
 
 
-def make_env(rank, random_start_prob=START_RANDOM_PROB, start_jitter=0):
+# A resumed run skips the curriculum entirely, and it has to be off from the
+# very first transition. Curriculum only reaches its first
+# set_random_start_prob() after 2048 callback calls, which across eight envs
+# is 16k timesteps -- four whole rollouts of the batch dilution the fine-tune
+# exists to avoid.
+COLD_START_PROB = 0.0 if RESUME else START_RANDOM_PROB
+
+
+def make_env(rank, random_start_prob=None, start_jitter=0):
+    prob = COLD_START_PROB if random_start_prob is None else random_start_prob
+
     def _init():
-        return MarioEnv(random_start_prob=random_start_prob,
+        return MarioEnv(random_start_prob=prob,
                         start_jitter=start_jitter,
                         speed_bonus=SPEED_BONUS, time_cost=TIME_COST,
                         seed=1000 + rank)
@@ -168,13 +188,13 @@ def main():
     # and once both ends of that range normalise above the clip they arrive
     # as the same number, which deletes exactly the signal saying that
     # finishing sooner is better.
-    if RESUME and os.path.exists(STATS):
+    if RESUME and os.path.exists(STATS_IN):
         # Resuming with a fresh normaliser means the first few thousand
         # steps are scaled by statistics that have not converged, which
         # arrives as enormous advantages and walks the policy away from the
         # one being resumed before it has learnt anything.
-        print(f"restoring reward statistics from {STATS}")
-        env = VecNormalize.load(STATS, venv)
+        print(f"restoring reward statistics from {STATS_IN}")
+        env = VecNormalize.load(STATS_IN, venv)
         env.training = True
     else:
         env = VecNormalize(venv, norm_obs=False, norm_reward=True,
@@ -255,8 +275,9 @@ def main():
 
     model.learn(total_timesteps=TIMESTEPS, callback=callbacks)
 
-    model.save("mario_model")
-    env.save(STATS)
+    os.makedirs(os.path.dirname(FINAL_OUT) or ".", exist_ok=True)
+    model.save(FINAL_OUT)
+    env.save(STATS_OUT)
 
     # Guarantee best_model exists even if eval never triggered (short runs).
     if not os.path.exists(os.path.join(BEST_DIR, "best_model.zip")):

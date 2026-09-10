@@ -88,8 +88,9 @@ reasons about absolute world coordinates:
 - wall sensors at 16/32/48/64px ahead (4)
 - **how tall the wall ahead is**, in tiles (1)
 - the next step down, and separately the next *bottomless pit* (4)
-- would a walk-jump clear that pit? would a run-jump? — both computed by
-  running the real integer physics forward (2)
+- would a full jump clear that pit, computed by running the real integer
+  physics forward — occupying two slots that necessarily hold the same
+  number (2, see below)
 - over-a-pit right now (1)
 - the nearest two goombas: distance, height, whether one is closing, and
   whether a stomp would land right now (5)
@@ -108,6 +109,18 @@ is exactly what happened while building this.
 
 *Goombas* — the old policy had no way to perceive an enemy, which is why AI
 mode used to run the level empty.
+
+One slot is dead weight, and knowingly so. Slots 18 and 19 were meant to be
+the walking and running answers to "would a jump clear this pit". They cannot
+differ: `X_Physics`' airborne branch selects the running row on speed alone
+and never reads the B button, so a jump's arc is set by the speed it launched
+at and nothing else. The `run=False` prediction used to gate on B as well and
+so landed 3.6 tiles short whenever Mario was actually running — exactly when
+the feature gets consulted. Both slots now carry the corrected number.
+Deleting the duplicate would change `OBS_SIZE` and invalidate every trained
+checkpoint, and the shipped policy turns out to be measurably indifferent to
+that slot — correcting it changes its play not at all, frame for frame, over
+20 runs — so the duplicate stays until the next retrain collapses it.
 
 ## Reward: finishing is not the same as finishing fast
 

@@ -10,9 +10,6 @@ reward, the episode boundaries, and where Mario starts.
 import os
 import random
 
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
-
 import gymnasium as gym
 import numpy as np
 import pygame
@@ -85,6 +82,15 @@ class MarioEnv(gym.Env):
 
     def __init__(self, render_mode=False, random_start_prob=0.0,
                  start_jitter=0, speed_bonus=0.05, time_cost=0.05, seed=None):
+        # Headless only when nobody wants to look at it. This has to happen
+        # before pygame picks a video driver, and it must NOT be done at
+        # import time: watch_ai.py and server.py import this module and then
+        # ask for render_mode=True, and a module-level dummy driver would
+        # leave them drawing into nothing -- with no window there is also no
+        # QUIT event, so the watcher would never even exit.
+        if not render_mode:
+            os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+            os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
         pygame.init()
         pygame.display.set_mode((1, 1))
         super().__init__()
@@ -142,19 +148,29 @@ class MarioEnv(gym.Env):
 
     # -- setup -------------------------------------------------------------
     def _find_spawns(self):
-        """Every column Mario can be dropped into: a solid surface with three
-        clear tiles of headroom above it."""
+        """Every column Mario can be dropped into: walkable ground with three
+        clear tiles of headroom above it.
+
+        "Walkable ground" means the top of the stack that rises from the
+        bottom of the level -- floor, pipe or stair -- not simply the highest
+        solid tile in the column. Taking the highest one put two fifths of
+        1-1's spawn points on top of the floating brick and question-block
+        rows, which is not a state a run from the start can reach, and it
+        also made the headroom test below vacuous: the topmost solid tile has
+        nothing above it by definition, so the check rejected nothing.
+        """
         spawns = []
+        floor_row = self.level.height - 1
         for col in range(2, self.level.width - 12):
-            surface = None
-            for row in range(self.level.height):
-                if self.level.solid_at(col, row):
-                    surface = row
-                    break
-            if surface is None or surface < 3:
+            if not self.level.solid_at(col, floor_row):
+                continue                        # a pit
+            surface = floor_row
+            while surface > 0 and self.level.solid_at(col, surface - 1):
+                surface -= 1
+            if surface < 3:
                 continue
             if any(self.level.solid_at(col, surface - k) for k in (1, 2, 3)):
-                continue
+                continue                        # something overhead
             spawns.append((col * TILE_PX, (surface - 3) * TILE_PX))
         return spawns
 
@@ -240,8 +256,13 @@ class MarioEnv(gym.Env):
         # running worth about twice a frame spent walking, locally, where PPO
         # can actually see it.
         reward -= self.time_cost
+        # Absolute speed, so this has to be gated on actually going forwards
+        # -- otherwise sprinting left collects the same bonus as sprinting
+        # right. The progress term outweighs it today, but the documented
+        # fine-tune workflow raises MARIO_SPEED_BONUS, and at that point
+        # paying for fast backwards motion would start to bite.
         over_walk = self.mario.x_speed_absolute - smb.MAX_RIGHT_X_SPEED[1]
-        if over_walk > 0:
+        if over_walk > 0 and delta_x > 0:
             span = smb.MAX_RIGHT_X_SPEED[0] - smb.MAX_RIGHT_X_SPEED[1]
             reward += self.speed_bonus * (over_walk / span)
 

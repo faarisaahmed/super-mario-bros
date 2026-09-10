@@ -69,8 +69,8 @@ class OBS:
     GAP_WIDTH = 15
     PIT_DIST = 16                           # next bottomless pit
     PIT_WIDTH = 17
-    WALK_CLEARS_PIT = 18
-    RUN_CLEARS_PIT = 19
+    WALK_CLEARS_PIT = 18                    # both hold the same value:
+    RUN_CLEARS_PIT = 19                     # airborne physics ignore B
     OVER_PIT = 20
     THREAT_DX = 21
     THREAT_DY = 22
@@ -312,10 +312,14 @@ class MarioSenses:
         same integer routines mario.py does, so the feature the policy sees
         agrees with the physics it actually gets.
 
-        `run` is whether B is held. It does not simply switch the speed cap:
-        X_Physics only takes the running row while airborne once absolute
-        speed already reaches AIR_RUN_SPEED, so a run-jump started from a
-        standstill accelerates like a walk until it gets there.
+        `run` is accepted for symmetry with the action space and is
+        deliberately ignored. X_Physics' airborne branch picks the running
+        row on `x_speed_absolute >= AIR_RUN_SPEED` alone and never reads the
+        B button, so a jump's arc is decided by the speed it launched at and
+        nothing else. Gating this on B as well used to make the run=False
+        prediction land 3.6 tiles short of the truth whenever Mario was
+        actually running -- which is precisely when the feature is consulted.
+        Both callers now get the same, correct number; see observe().
         """
         if not mario.on_ground:
             return None
@@ -349,9 +353,9 @@ class MarioSenses:
                 y_moveforce = 0
 
             # --- horizontal, holding right the whole way --------------
-            # X_Physics airborne branch: the running row applies only once
-            # absolute speed is already at AIR_RUN_SPEED.
-            if run and abs(x_speed) >= smb.AIR_RUN_SPEED:
+            # X_Physics airborne branch: the running row applies once
+            # absolute speed is at AIR_RUN_SPEED, whatever B is doing.
+            if abs(x_speed) >= smb.AIR_RUN_SPEED:
                 adder = smb.FRICTION[0]
                 cap = smb.MAX_RIGHT_X_SPEED[0]
             else:
@@ -438,8 +442,8 @@ class MarioSenses:
           15:     width of that step-down / LOOK              (0 = none)
           16:     distance to the next bottomless pit / LOOK  (1 = none near)
           17:     width of that pit / LOOK                    (0 = none)
-          18:     (walk-jump landing - pit far edge) / tiles, clamped
-          19:     (run-jump  landing - pit far edge) / tiles, clamped
+          18:     (full-jump landing - pit far edge) / tiles, clamped
+          19:     the same number again -- see the note below
           20:     over_pit -- nothing solid below Mario right now (0/1)
           21-22:  nearest goomba dx / LOOK, dy / 3 tiles  (1, 0 = none)
           23:     that goomba is walking towards him       (0/1)
@@ -460,13 +464,20 @@ class MarioSenses:
         if pit_start is not None:
             dist_to_pit = _clamp((pit_start - mario.x) / LOOK, -1.0, 1.0)
             pit_width = _clamp((pit_end - pit_start) / LOOK, 0.0, 1.0)
-            # Would a jump taken right now land past the far side of it?
-            walk_land = self.estimate_landing_x(mario, level, FULL_JUMP_HOLD, False)
-            run_land = self.estimate_landing_x(mario, level, FULL_JUMP_HOLD, True)
-            walk_clears = (_clamp((walk_land - pit_end) / span, -1.0, 1.0)
-                           if walk_land is not None else 0.0)
-            run_clears = (_clamp((run_land - pit_end) / span, -1.0, 1.0)
-                          if run_land is not None else 0.0)
+            # Would a full jump taken right now land past the far side?
+            #
+            # Slots 18 and 19 were meant to be "walking" and "running"
+            # answers. They cannot differ: the airborne physics read speed,
+            # not the B button, so there is one answer and this is it. The
+            # duplicated slot is left in place because removing it changes
+            # OBS_SIZE and so invalidates every trained checkpoint, and the
+            # shipped policy is measurably indifferent to it -- correcting
+            # slot 18 changes its play not at all, frame for frame. Collapse
+            # the two at the next retrain.
+            land = self.estimate_landing_x(mario, level, FULL_JUMP_HOLD)
+            clears = (_clamp((land - pit_end) / span, -1.0, 1.0)
+                      if land is not None else 0.0)
+            walk_clears = run_clears = clears
         else:
             dist_to_pit, pit_width = 1.0, 0.0
             walk_clears = run_clears = 0.0
